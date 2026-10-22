@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="fi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#006b4f" />
+    <meta name="description" content="Ruokareitti-vierailujen muistiinpanot ja raportit." />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="icon.svg" />
+    <title>Ruokareitti – vierailumuistiinpanot</title>
+    <style>
+      :root { --green:#006b4f; --green-dark:#004e3a; --mint:#e8f4ef; --ink:#17221e; --muted:#56645e; --line:#cad8d1; --paper:#fff; --bg:#f2f6f3; --danger:#a72727; }
+      * { box-sizing:border-box; }
+      body { margin:0; color:var(--ink); background:var(--bg); font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; }
+      button,input,textarea { font:inherit; }
+      .top { background:linear-gradient(120deg,var(--green-dark),var(--green)); color:#fff; padding:28px max(18px, calc((100% - 1120px)/2)); }
+      .top-inner { max-width:1120px; margin:auto; }
+      h1 { margin:0; font-size:clamp(1.5rem,4vw,2.2rem); letter-spacing:-.02em; }
+      .top p { margin:.35rem 0 0; color:#dbeee6; }
+      main { max-width:1120px; margin:24px auto 64px; padding:0 16px; }
+      .notice { border-left:4px solid #e5a100; background:#fff8df; padding:11px 13px; margin:0 0 20px; color:#5e4800; border-radius:4px; }
+      .card { background:var(--paper); border:1px solid var(--line); border-radius:12px; box-shadow:0 2px 7px #1d382b0d; margin:16px 0; overflow:hidden; }
+      .card-title { display:flex; gap:12px; align-items:center; justify-content:space-between; padding:15px 17px; background:var(--mint); border-bottom:1px solid var(--line); }
+      h2 { font-size:1.18rem; margin:0; }
+      .meta { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; padding:17px; }
+      label { display:block; font-weight:650; font-size:.92rem; }
+      input,textarea { width:100%; border:1px solid #aebfb6; border-radius:7px; background:#fff; color:var(--ink); padding:10px 11px; margin-top:5px; }
+      input:focus,textarea:focus { outline:3px solid #b5ddcd; border-color:var(--green); }
+      textarea { resize:vertical; min-height:104px; }
+      .topic { border-top:1px solid var(--line); padding:18px 17px; }
+      .topic:first-of-type { border-top:0; }
+      h3 { margin:0 0 12px; font-size:1rem; color:var(--green-dark); }
+      .answers { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+      .final { padding:17px; border-top:2px solid var(--green); background:#fbfdfb; }
+      .final textarea { min-height:120px; }
+      .toolbar { display:flex; flex-wrap:wrap; gap:10px; margin:22px 0; }
+      button,.button { border:0; border-radius:7px; padding:11px 15px; background:var(--green); color:#fff; cursor:pointer; font-weight:700; text-decoration:none; }
+      button:hover { background:var(--green-dark); }
+      button.secondary { background:#e7eeea; color:#183c2e; }
+      button.secondary:hover { background:#d8e4de; }
+      button.danger { color:var(--danger); background:#fff; border:1px solid #e5b1b1; padding:7px 10px; font-size:.88rem; }
+      button.danger:hover { background:#fff1f1; }
+      .small { color:var(--muted); font-size:.87rem; margin:.15rem 0 0; }
+      .empty { padding:30px 17px; text-align:center; color:var(--muted); }
+      footer { color:var(--muted); font-size:.86rem; text-align:center; margin-top:22px; }
+      @media (max-width:720px) { .meta,.answers { grid-template-columns:1fr; } .top{ padding-top:22px; padding-bottom:22px; } textarea { min-height:96px; } }
+      @media print {
+        @page { size:A4; margin:12mm; }
+        body { background:#fff; font-size:10pt; }
+        .top { background:#fff !important; color:#000; padding:0 0 7mm; border-bottom:2px solid #006b4f; }
+        .top p { color:#333; } main { max-width:none; margin:0; padding:0; } .notice,.toolbar,footer,.delete { display:none !important; }
+        .card { box-shadow:none; border:0; border-radius:0; overflow:visible; break-inside:avoid-page; }
+        .card-title { padding:5mm 0 3mm; background:#fff; border-bottom:1px solid #000; }
+        .meta { padding:4mm 0; gap:5mm; }
+        .topic { padding:4mm 0; break-inside:avoid-page; }
+        .answers { gap:4mm; }
+        textarea,input { border:0; padding:0; min-height:0 !important; border-radius:0; background:transparent; white-space:pre-wrap; overflow:visible; }
+        textarea { height:auto !important; }
+        label { font-size:8.5pt; } h3 { font-size:10pt; } .final { background:#fff; padding:4mm 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="top"><div class="top-inner"><h1>Ruokareitti – vierailumuistiinpanot</h1><p>Kirjaa havainnot kohteittain ja tallenna yhteenveto PDF-muotoon.</p></div></header>
+    <main>
+      <p class="notice">Tiedot tallentuvat vain tälle laitteelle ja tähän selaimeen. Ota tarvittaessa varmuuskopio ennen selaimen tietojen tyhjentämistä.</p>
+      <section id="visits" aria-live="polite"></section>
+      <div class="toolbar" aria-label="Toiminnot">
+        <button id="addVisit">+ Lisää uusi kohde</button>
+        <button class="secondary" id="print">Tulosta / tallenna PDF</button>
+        <button class="secondary" id="backup">Tallenna varmuuskopio</button>
+        <label class="button secondary" for="restore">Palauta varmuuskopio</label><input id="restore" type="file" accept="application/json" hidden />
+      </div>
+      <footer>Ruokareitti #4 · Vierailumuistiinpanot</footer>
+    </main>
+    <script>
+      const storageKey = 'ruokareitti-vierailut-v1';
+      const topics = [
+        'Ympäristöviisaita ratkaisuja sujuvaan ruokaketjun logistiikkaan',
+        'Kustannustehokkuus, sujuvuus; hukan vähentäminen',
+        'Optimoidut reitit, lyhyemmät logistiikkaketjut'
+      ];
+      const questions = ['Mikä toimii hyvin?', 'Mikä herätti kysymyksiä?', 'Mitä voisi tehdä toisin tai paremmin?'];
+      let visits = load();
+      function newVisit() { return { id: crypto.randomUUID(), site:'', date:new Date().toISOString().slice(0,10), participant:'', answers: topics.map(()=>['','','']), ownUse:'' }; }
+      function load() { try { const saved=JSON.parse(localStorage.getItem(storageKey)); return Array.isArray(saved)&&saved.length ? saved : [newVisit()]; } catch { return [newVisit()]; } }
+      function save() { localStorage.setItem(storageKey, JSON.stringify(visits)); }
+      const esc = value => String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+      function field(id,label,value,type='text',data='') { return `<label for="${id}">${label}<${type === 'textarea' ? 'textarea' : 'input'} id="${id}" data-field ${data} ${type === 'textarea' ? '' : `type="${type}" value="${esc(value)}"`} placeholder="Kirjoita tähän…">${type === 'textarea' ? esc(value)+'</textarea>' : ''}</label>`; }
+      function visitHtml(v,index) {
+        const title = v.site.trim() || `Kohde ${index+1}`;
+        const meta = `<div class="meta">${field(`site-${v.id}`,'Kohde / organisaatio',v.site,'text',`data-visit="${v.id}" data-key="site"`)}${field(`date-${v.id}`,'Vierailupäivä',v.date,'date',`data-visit="${v.id}" data-key="date"`)}${field(`participant-${v.id}`,'Osallistuja',v.participant,'text',`data-visit="${v.id}" data-key="participant"`)}</div>`;
+        const topicHtml=topics.map((topic,t) => `<section class="topic"><h3>${topic}</h3><div class="answers">${questions.map((q,qIndex)=>field(`answer-${v.id}-${t}-${qIndex}`,q,v.answers[t]?.[qIndex]||'','textarea',`data-visit="${v.id}" data-topic="${t}" data-question="${qIndex}"`)).join('')}</div></section>`).join('');
+        return `<article class="card" data-visit="${v.id}"><div class="card-title"><div><h2>${esc(title)}</h2><p class="small">Kohde ${index+1}</p></div>${visits.length>1?`<button class="danger delete" data-delete="${v.id}">Poista kohde</button>`:''}</div>${meta}${topicHtml}<section class="final">${field(`own-${v.id}`,'Mitä näkemääsi tai kuulemaasi voisit hyödyntää omassa organisaatiossasi?',v.ownUse,'textarea',`data-visit="${v.id}" data-key="ownUse"`)}</section></article>`;
+      }
+      function render() { document.getElementById('visits').innerHTML = visits.map(visitHtml).join(''); attachEvents(); }
+      function setValue(v,el,value) {
+        if(el.dataset.key) v[el.dataset.key]=value;
+        else v.answers[+el.dataset.topic][+el.dataset.question]=value;
+      }
+      function attachEvents() {
+        document.querySelectorAll('[data-field]').forEach(el => {
+          el.addEventListener('input', e => { const v=visits.find(x => x.id === e.target.dataset.visit); if(v){ setValue(v,e.target,e.target.value); save(); } });
+          el.addEventListener('change', e => { if(e.target.dataset.key === 'site') render(); });
+        });
+        document.querySelectorAll('[data-delete]').forEach(el => el.addEventListener('click', () => { if(confirm('Poistetaanko tämä kohde ja sen muistiinpanot?')) { visits=visits.filter(v=>v.id!==el.dataset.delete); save(); render(); } }));
+      }
+      document.getElementById('addVisit').addEventListener('click',()=>{ visits.push(newVisit()); save(); render(); window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'}); });
+      document.getElementById('print').addEventListener('click',()=>{ document.querySelectorAll('textarea').forEach(a=>a.style.height='auto'); window.print(); });
+      document.getElementById('backup').addEventListener('click',()=>{ const blob=new Blob([JSON.stringify({app:'Ruokareitti-vierailut',version:1,exportedAt:new Date().toISOString(),visits},null,2)],{type:'application/json'}); const link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download=`ruokareitti-varmuuskopio-${new Date().toISOString().slice(0,10)}.json`; link.click(); URL.revokeObjectURL(link.href); });
+      document.getElementById('restore').addEventListener('change', async e => { const file=e.target.files[0]; if(!file) return; try { const data=JSON.parse(await file.text()); if(!Array.isArray(data.visits)) throw new Error(); if(!confirm('Palautus korvaa nykyiset muistiinpanot tällä laitteella. Jatketaanko?')) return; visits=data.visits; save(); render(); alert('Varmuuskopio palautettu.'); } catch { alert('Tiedosto ei ole tämän sovelluksen kelvollinen varmuuskopio.'); } finally { e.target.value=''; } });
+      if('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js');
+      render();
+    </script>
+  </body>
+</html>
