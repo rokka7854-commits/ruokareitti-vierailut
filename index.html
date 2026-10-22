@@ -67,12 +67,14 @@
       <section id="visits" aria-live="polite"></section>
       <div class="toolbar" aria-label="Toiminnot">
         <button id="addVisit">+ Lisää uusi kohde</button>
-        <button class="secondary" id="print">Tulosta / tallenna PDF</button>
+        <button class="secondary" id="savePdf">Tallenna PDF</button>
+        <button id="sharePdf">Jaa / lähetä PDF</button>
         <button class="secondary" id="backup">Tallenna varmuuskopio</button>
         <label class="button secondary" for="restore">Palauta varmuuskopio</label><input id="restore" type="file" accept="application/json" hidden />
       </div>
       <footer>Ruokareitti #4 · Vierailumuistiinpanot</footer>
     </main>
+    <script src="jspdf.umd.min.js"></script>
     <script>
       const storageKey = 'ruokareitti-vierailut-v1';
       const topics = [
@@ -106,7 +108,48 @@
         document.querySelectorAll('[data-delete]').forEach(el => el.addEventListener('click', () => { if(confirm('Poistetaanko tämä kohde ja sen muistiinpanot?')) { visits=visits.filter(v=>v.id!==el.dataset.delete); save(); render(); } }));
       }
       document.getElementById('addVisit').addEventListener('click',()=>{ visits.push(newVisit()); save(); render(); window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'}); });
-      document.getElementById('print').addEventListener('click',()=>{ document.querySelectorAll('textarea').forEach(a=>a.style.height='auto'); window.print(); });
+      function pdfFilename() { return `ruokareitti-vierailut-${new Date().toISOString().slice(0,10)}.pdf`; }
+      function makePdf() {
+        if(!window.jspdf) throw new Error('PDF-kirjasto ei latautunut. Tarkista verkkoyhteys ensimmäisellä käyttökerralla.');
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit:'mm', format:'a4' });
+        const margin = 16, width = 178, bottom = 280;
+        let y = 17;
+        const page = () => { if(y > bottom) { doc.addPage(); y = 17; } };
+        const text = (value, size=10, style='normal', gap=4) => {
+          doc.setFont('helvetica', style); doc.setFontSize(size);
+          const lines = doc.splitTextToSize(String(value || '—'), width);
+          lines.forEach(line => { page(); doc.text(line, margin, y); y += size * .48; });
+          y += gap;
+        };
+        doc.setProperties({ title:'Ruokareitti – vierailumuistiinpanot', subject:'Vierailumuistiinpanot' });
+        text('Ruokareitti – vierailumuistiinpanot', 18, 'bold', 2);
+        text(`Luotu ${new Date().toLocaleDateString('fi-FI')}`, 9, 'normal', 7);
+        visits.forEach((visit, index) => {
+          page(); text(visit.site.trim() || `Kohde ${index + 1}`, 14, 'bold', 2);
+          text(`Vierailupäivä: ${visit.date || '—'}    Osallistuja: ${visit.participant || '—'}`, 9, 'normal', 5);
+          topics.forEach((topic, topicIndex) => {
+            page(); text(topic, 11, 'bold', 2);
+            questions.forEach((question, questionIndex) => {
+              text(question, 9, 'bold', 1);
+              text(visit.answers[topicIndex]?.[questionIndex] || '—', 9, 'normal', 4);
+            });
+          });
+          text('Mitä näkemääsi tai kuulemaasi voisit hyödyntää omassa organisaatiossasi?', 10, 'bold', 1);
+          text(visit.ownUse || '—', 9, 'normal', 7);
+          if(index < visits.length - 1) { doc.addPage(); y = 17; }
+        });
+        return doc.output('blob');
+      }
+      function downloadPdf(file) { const link=document.createElement('a'); link.href=URL.createObjectURL(file); link.download=file.name; link.click(); setTimeout(()=>URL.revokeObjectURL(link.href),1000); }
+      document.getElementById('savePdf').addEventListener('click', () => { try { const blob=makePdf(); downloadPdf(new File([blob],pdfFilename(),{type:'application/pdf'})); } catch(error) { alert(error.message); } });
+      document.getElementById('sharePdf').addEventListener('click', async () => {
+        try {
+          const file=new File([makePdf()],pdfFilename(),{type:'application/pdf'});
+          if(navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))) await navigator.share({title:'Ruokareitti – vierailumuistiinpanot',text:'Vierailumuistiinpanot PDF-liitteenä.',files:[file]});
+          else { downloadPdf(file); alert('Laitteesi ei tue PDF-tiedoston jakamista suoraan. PDF ladattiin, ja voit lähettää sen valitsemassasi sovelluksessa.'); }
+        } catch(error) { if(error.name !== 'AbortError') alert('PDF:n jakaminen ei onnistunut: ' + error.message); }
+      });
       document.getElementById('backup').addEventListener('click',()=>{ const blob=new Blob([JSON.stringify({app:'Ruokareitti-vierailut',version:1,exportedAt:new Date().toISOString(),visits},null,2)],{type:'application/json'}); const link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download=`ruokareitti-varmuuskopio-${new Date().toISOString().slice(0,10)}.json`; link.click(); URL.revokeObjectURL(link.href); });
       document.getElementById('restore').addEventListener('change', async e => { const file=e.target.files[0]; if(!file) return; try { const data=JSON.parse(await file.text()); if(!Array.isArray(data.visits)) throw new Error(); if(!confirm('Palautus korvaa nykyiset muistiinpanot tällä laitteella. Jatketaanko?')) return; visits=data.visits; save(); render(); alert('Varmuuskopio palautettu.'); } catch { alert('Tiedosto ei ole tämän sovelluksen kelvollinen varmuuskopio.'); } finally { e.target.value=''; } });
       if('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js');
